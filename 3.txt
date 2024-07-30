@@ -1,0 +1,187 @@
+a <<- 0
+b <<- 2*pi
+#Функция u(x)
+Ux <- function(x) {
+  return (pi^3*fsin(x)+x)
+}
+#Функция x^2
+fx_in2 <- function(x) {
+  return(x*x)
+}
+#Функция x^3
+fx_in3 <- function(x) {
+  return(x*x*x)
+}
+#Функция sin(x)
+fsin <- function(x) {
+  if(x %% pi == 0) {
+    return(0)
+  }
+  return(sin(x))
+}
+#Функция cos(x)
+fcos <- function(x) {
+  if(x %% (pi/2) == 0) {
+    if(x %% pi != 0) {
+      return(0)
+    }
+  }
+  return(cos(x))
+}
+
+e_kx <- function(x,k,x_arr) {
+  if((x >= x_arr[k-1]) && (x <= x_arr[k])) {
+    return(1)
+  }
+  return(0)
+}
+
+delta_j <- function(j,x_arr) {
+  return(x_arr[j] - x_arr[j-1])
+}
+
+#Двойной интеграл K(x,s) - посчитан вручную
+K_xs <- function(j,k,x_arr) {
+  
+  return(1/2* (fcos(x_arr[j-1]) - fcos(x_arr[j])) * ((x_arr[k]-pi)*abs(x_arr[k]-pi) + (pi-x_arr[k-1])*abs(x_arr[k-1]-pi)))
+  
+  
+  # return((1/2) * (fsin(x_arr[k]) - fsin(x_arr[k-1])) * (fx_in2(x_arr[j]) - fx_in2(x_arr[j-1])) -
+  #    (1/3) * (fx_in3(x_arr[k]) - fx_in3(x_arr[k-1])) * (fcos(x_arr[j]) - fcos(x_arr[j-1])) -
+  #   (fsin(x_arr[j]) - fsin(x_arr[j-1])) * (fcos(x_arr[k]) - fcos(x_arr[k-1])))
+}
+
+Projection <- function(h1) {
+  h = h1
+  x_arr <<- c(a)
+  F_x <<- c(0)
+  C_x <<- c(0)
+  
+  x_generate <- function() {
+    i = 1
+    while(x_arr[i] < b) {
+      i = i+1
+      x_arr[i] <<- (a+(i-1)*h)
+    }
+  }
+  
+  K_search <- function() {
+    for(j in 2:n) {
+      for(k in 2:n) {
+        K_x[j,k] <<- (K_xs(j,k,x_arr)/delta_j(j,x_arr))
+      }
+    }
+    
+    # Вычитаем единицы из диагонали, чтобы привести к нужному виду
+    for(k in 2:n) {               
+      for(j in 2:n) {
+        if(k == j) {
+          K_x[k,j] <<- (K_x[k,j] - 1)
+        }
+      }
+    } 
+  }
+  
+  F_search <- function() {
+    for(j in 2:n){
+      F_x[j] <<- ((fx_in2(x_arr[j])) - (fx_in2(x_arr[j-1]))) / (2 * delta_j(j,x_arr))
+    }
+    # Умножаем на (-1), поскольку перенесли F в другую часть
+    F_x <<- F_x*c(-1)           
+  }
+  #Приводим систему уравнений к треугольному виду методом Гаусса
+  Gauss <- function() {
+    
+    for(k in 2:n) {
+      
+      # Поиск максимума
+      max_k <- abs(K_x[k,k])
+      index <- k
+      i <- k+1
+      while (i <= n){
+        if (abs(K_x[i,k]) == max_k) { # знак >
+          max_k <- abs(K_x[i,k])
+          index <- i
+        }
+        i <- i+1
+      }
+      
+      # Перестановка
+      for (j in 2:n) {
+        temp <- K_x[k,j]
+        K_x[k,j] <<- K_x[index,j]
+        K_x[index,j] <<- temp
+      }
+      
+      temp <- F_x[k]
+      F_x[k] <<- F_x[index]
+      F_x[index] <<- temp
+      
+      # Нормализация уравнений
+      i <- k
+      while(i <= n) {
+        temp <- K_x[i,k]
+        j <- 2
+        while(j <= n){
+          K_x[i,j] <<- (K_x[i,j]/temp)
+          j <- j + 1
+        }
+        F_x[i] <<- (F_x[i]/temp)
+        if (i != k){
+          for (j in 2:n){
+            K_x[i,j] <<- (K_x[i,j] - K_x[k,j])
+          }
+          F_x[i] <<- F_x[i] - F_x[k]
+        }
+        i <- i + 1
+      }
+    }
+    
+    # обратная подстановка
+    for (k in n:2)
+    {
+      C_x[k] <<- F_x[k]
+      i <- 2
+      while (i < k){
+        F_x[i] <<- (F_x[i] - (K_x[i,k] * C_x[k]))
+        i <- i + 1
+      }
+    }
+  }
+  #Расчет Un(x)
+  U_nx <- function(x) {
+    sum <- 0
+    for(k in 2:n){
+      sum <- sum + (C_x[k]*e_kx(x,k,x_arr))
+    }
+    return(sum)
+  }
+  
+  x_generate()
+  
+  n <- (length(x_arr))
+  K_x <<- matrix(0, byrow = TRUE, ncol = (n), nrow = (n))
+  K_search()
+  F_search()
+  Gauss()
+  #------------------------------------График-------------------------------------  
+  Numerical <<- c(0)
+  Precise <<- c(0)
+  
+  for(i in 2:n){
+    Numerical[i] <<- U_nx(x_arr[i]-(h/2))
+    Precise[i] <<- Ux(x_arr[i]-(h/2))
+    #print(U_x_1[i])
+    #print(U_x_2[i])
+  }
+  
+  par(bg = "white")
+  plot1 <- plot(x_arr[2:n], Numerical[2:n], col = "orange", xlab = "x", ylab = "u", pch = 19, cex = 2) 
+  plot2 <- plot1 + points(x_arr[2:n], Precise[2:n], col = "blue", pch = 4, cex = 3)
+  grid(col = "black")
+  
+  
+  #legend("bottomright", legend = c("Numerical desicion Un(x)","Precise decision U(x)"), fill = c("black", "red"))
+}
+
+Projection(pi/10)
